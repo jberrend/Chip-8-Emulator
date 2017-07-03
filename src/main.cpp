@@ -25,7 +25,7 @@ int main() {
 //    rom.close();
 
     emulator emu;
-    emu.loadRom("Games/PONG");
+    emu.loadRom("../Games/PONG");
     emu.initializeDisplay();
     emu.run();
     return 0;

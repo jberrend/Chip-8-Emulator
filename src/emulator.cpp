@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <thread>
+#include <iostream>
 #include "emulator.h"
 #include "instruction.h"
 
@@ -41,6 +42,9 @@ void emulator::loadRom(std::string name) {
 
     // set the PC to point to the start of the program
     PC = 0x200;
+
+    // seed the RNG
+    srand(time(NULL));
 }
 
 void emulator::printRomContents() {
@@ -79,6 +83,12 @@ void emulator::run() {
     bool running = true;
     struct instruction_t instr;
     while (running) {
+        // start the timer that ensures paces the program's execution and
+        // timer registers
+        auto startTime = std::chrono::high_resolution_clock::now();
+
+        // the time execution of the next instruction should ideally be finished before (1/500 of a second)
+        auto endGoalTime = startTime + std::chrono::milliseconds(1000 / 1000);
         // load the next instruction to be executed
         instr.left_byte = memory[PC];
         instr.right_byte = memory[PC + 1];
@@ -91,6 +101,21 @@ void emulator::run() {
         // process the instruction
         processInstruction(instr);
 
+//        dis.clearBuffer();
+
+        // update timer registers // TODO: implement threading or something to update these at a 60Hz interval
+        if (delay_timer > 0) {
+            delay_timer--;
+        }
+        if (sound_timer > 0) {
+            sound_timer--;
+        }
+        // sleep until end goal time
+        if (std::chrono::high_resolution_clock::now() > endGoalTime) {
+            std::cerr << "WARNING: Instruction took longer than expected" << std::endl;
+        }
+        std::this_thread::sleep_until(endGoalTime);
+
     }
 }
 
@@ -99,13 +124,59 @@ void emulator::processInstruction(struct instruction_t instr) {
 
     // switch with the left most nibble of the instruction
     switch (instr.left_byte & 0xF0) {
+        case 0x00:
+            switch (instr.right_byte) {
+                case 0x00:
+                    printf("clearing display");
+                    dis.clearBuffer();
+                    PC += 2;
+                    break;
+
+                case 0xEE:
+                    printf("Return from Subroutine to 0x%X", stack[SP]);
+                    PC = stack[SP];
+                    SP--;
+                    PC += 2;
+                    break;
+
+                default:
+                    printf("ERROR: Unknown instruction\n");
+                    exit(1);
+            }
+
+            break;
+
+        case 0x10:
+            printf("Jumping to %X\n", instr.whole_instr & 0x0FFF);
+            PC = (unsigned short) (instr.whole_instr & 0x0FFF);
+            break;
         case 0x20:
-//            byte subroutineAddress = (byte) (instr.whole_instr & 0x0FFF);
             printf("calling subroutine at 0x%X\n", (unsigned short) (instr.whole_instr & 0x0FFF));
 
             SP++;
             stack[SP] = PC;
             PC = (unsigned short) (instr.whole_instr & 0x0FFF);
+            break;
+
+        case 0x30:
+            printf("Skipping next instr if register %X = %X\n", instr.left_byte & 0x0F, instr.right_byte);
+
+            // if instr is to be skipped, increment the PC an additional time
+            if (registers[instr.left_byte & 0x0F] == instr.right_byte) {
+                printf("Skipping.\n");
+                PC += 2;
+            }
+
+            PC += 2;
+            break;
+
+        case 0x40:
+            printf("Skipping if %X != %X\n", registers[instr.left_byte & 0x0F], instr.right_byte);
+            if (registers[instr.left_byte & 0x0F] != instr.right_byte) {
+                printf("Skipping\n");
+                PC += 2;
+            }
+            PC += 2;
             break;
 
         case 0x60:
@@ -118,11 +189,52 @@ void emulator::processInstruction(struct instruction_t instr) {
             PC += 2;
             break;
 
+        case 0x70:
+            printf("adding 0x%X to register:%X \n", instr.right_byte, instr.left_byte & 0x0F);
+            registers[instr.left_byte & 0x0F] += instr.right_byte;
+
+            PC += 2;
+            break;
+
+        case 0x80:
+            // determine which instruction to execute
+            switch (instr.right_byte & 0x0F) {
+                case 0x02:
+                    printf("ANDing registers\n");
+                    registers[instr.left_byte & 0x0F] &= registers[(instr.right_byte & 0xF0) >> 4];
+                    break;
+
+                case 0x04: // TODO: Check if this works properly
+                    printf("Adding registers together checking for overflow\n");
+                    if (registers[instr.left_byte & 0x0F] + registers[(instr.right_byte & 0xF0) >> 4] > 255) {
+                        printf("Carry set\n");
+                        registers[0xF] = 0x01;
+                    } else {
+                        printf("Carry unset\n");
+                        registers[0xF] = 0x00;
+                    }
+
+                    registers[instr.left_byte & 0x0F] += registers[(instr.right_byte & 0xF0) >> 4];
+                    break;
+                default:
+                    printf("ERROR: Unknown instruction\n");
+                    exit(1);
+            }
+
+            PC += 2;
+            break;
         case 0xA0:
             printf("Changing I to %X\n", instr.whole_instr & 0x0FFF);
 
             // change I to the appropriate value
             reg_I = (unsigned short) (instr.whole_instr & 0x0FFF);
+
+            PC += 2;
+            break;
+
+        case 0xC0:
+            printf("generating random number... \n");
+            registers[instr.left_byte & 0x0F] = (byte) (rand() % 256) & instr.right_byte;
 
             PC += 2;
             break;
@@ -135,10 +247,44 @@ void emulator::processInstruction(struct instruction_t instr) {
             PC += 2;
             break;
 
+        case 0xE0:
+            printf("Skipping next instr if key %X is pressed\n", registers[instr.left_byte & 0x0F]);
+
+            // is the key down?
+            if (inputHandler.isKeyDown(registers[instr.left_byte & 0x0F])) {
+                // skip.
+                printf("Skipping.\n");
+                PC += 2;
+            }
+
+            PC += 2;
+            break;
         case 0xF0:
             switch (instr.right_byte) {
+                case 0x07:
+                    printf("Setting register %X to %X (delay timer)\n", instr.left_byte & 0x0F, delay_timer);
+                    registers[instr.left_byte & 0x0F] = delay_timer;
+
+                    PC += 2;
+                    break;
+                case 0x15:
+                    printf("Updating delay timer to 0x%X\n", registers[instr.left_byte & 0x0F]);
+                    delay_timer = registers[instr.left_byte & 0x0F];
+
+                    PC += 2;
+                    break;
+                case 0x29:
+                    printf("Setting I to location of sprite located in register %X: %X\n", instr.left_byte & 0x0F,
+                           registers[instr.left_byte & 0x0F]);
+
+                    processSpriteLoadInstr(instr);
+
+                    PC += 2;
+                    break;
+
                 case 0x33:
-                    printf("Storing %i from register %X in I\n", registers[instr.left_byte & 0x0F], instr.left_byte & 0x0F);
+                    printf("Storing %i from register %X in I\n", registers[instr.left_byte & 0x0F],
+                           instr.left_byte & 0x0F);
 
                     // hundreds place
                     memory[reg_I] = (byte) ((registers[instr.left_byte & 0x0F] / 100) % 10);
@@ -172,7 +318,7 @@ void emulator::processInstruction(struct instruction_t instr) {
         default:
             // unknown or unimplemented instruction - exit
             fprintf(stdout, "ERROR: Unknown instruction\n");
-            // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5000));
             exit(1);
     }
 }
@@ -208,4 +354,162 @@ void emulator::processDisplayInstr(instruction_t instr) {
             sprite <<= 1;
         }
     }
+}
+
+void emulator::processSpriteLoadInstr(instruction_t instr) {
+    byte spriteToLoad = (byte) (registers[instr.left_byte & 0x0F]);
+
+    switch (spriteToLoad) {
+        case 0x00:
+            reg_I = spriteLocations::zero;
+            break;
+        case 0x01:
+            reg_I = spriteLocations::one;
+            break;
+        case 0x02:
+            reg_I = spriteLocations::two;
+            break;
+        case 0x03:
+            reg_I = spriteLocations::three;
+            break;
+        case 0x04:
+            reg_I = spriteLocations::four;
+            break;
+        case 0x05:
+            reg_I = spriteLocations::five;
+            break;
+        case 0x06:
+            reg_I = spriteLocations::six;
+            break;
+        case 0x07:
+            reg_I = spriteLocations::seven;
+            break;
+        case 0x08:
+            reg_I = spriteLocations::eight;
+            break;
+        case 0x09:
+            reg_I = spriteLocations::nine;
+            break;
+        case 0x0A:
+            reg_I = spriteLocations::A;
+            break;
+        case 0x0B:
+            reg_I = spriteLocations::B;
+            break;
+        case 0x0C:
+            reg_I = spriteLocations::C;
+            break;
+        case 0x0D:
+            reg_I = spriteLocations::D;
+            break;
+        case 0x0E:
+            reg_I = spriteLocations::E;
+            break;
+        case 0x0F:
+            reg_I = spriteLocations::F;
+            break;
+
+        default:
+            printf("ERROR: Sprite out of range");
+            exit(1);
+    }
+}
+
+void emulator::loadSprites() {
+    // 0
+    memory[0x000] = 0xF0;
+    memory[0x001] = 0x90;
+    memory[0x002] = 0x90;
+    memory[0x003] = 0x90;
+    memory[0x004] = 0xF0;
+    // 1
+    memory[0x005] = 0x20;
+    memory[0x006] = 0x60;
+    memory[0x007] = 0x20;
+    memory[0x008] = 0x20;
+    memory[0x009] = 0x70;
+    // 2
+    memory[0x00A] = 0xF0;
+    memory[0x00B] = 0x10;
+    memory[0x00C] = 0xF0;
+    memory[0x00D] = 0x80;
+    memory[0x00E] = 0xF0;
+    // 3
+    memory[0x00F] = 0xF0;
+    memory[0x010] = 0x10;
+    memory[0x011] = 0xF0;
+    memory[0x012] = 0x10;
+    memory[0x013] = 0xF0;
+    // 4
+    memory[0x014] = 0x90;
+    memory[0x015] = 0x90;
+    memory[0x016] = 0xF0;
+    memory[0x017] = 0x10;
+    memory[0x018] = 0x10;
+    // 5
+    memory[0x019] = 0xF0;
+    memory[0x01A] = 0x80;
+    memory[0x01B] = 0xF0;
+    memory[0x01C] = 0x10;
+    memory[0x01D] = 0xF0;
+    // 6
+    memory[0x01E] = 0xF0;
+    memory[0x01F] = 0x80;
+    memory[0x020] = 0xF0;
+    memory[0x021] = 0x90;
+    memory[0x022] = 0xF0;
+    // 7
+    memory[0x023] = 0xF0;
+    memory[0x024] = 0x10;
+    memory[0x025] = 0x20;
+    memory[0x026] = 0x40;
+    memory[0x027] = 0x40;
+    // 8
+    memory[0x028] = 0xF0;
+    memory[0x029] = 0x90;
+    memory[0x02A] = 0xF0;
+    memory[0x02B] = 0x90;
+    memory[0x02C] = 0xF0;
+    // 9
+    memory[0x02D] = 0xF0;
+    memory[0x02E] = 0x90;
+    memory[0x02F] = 0xF0;
+    memory[0x030] = 0x10;
+    memory[0x031] = 0xF0;
+    // A
+    memory[0x032] = 0xF0;
+    memory[0x033] = 0x90;
+    memory[0x034] = 0xF0;
+    memory[0x035] = 0x90;
+    memory[0x036] = 0x90;
+    // B
+    memory[0x037] = 0xE0;
+    memory[0x038] = 0x90;
+    memory[0x039] = 0xE0;
+    memory[0x03A] = 0x90;
+    memory[0x03B] = 0xE0;
+    // C
+    memory[0x03C] = 0xF0;
+    memory[0x03D] = 0x80;
+    memory[0x03E] = 0x80;
+    memory[0x03F] = 0x80;
+    memory[0x040] = 0xF0;
+    // D
+    memory[0x041] = 0xE0;
+    memory[0x042] = 0x90;
+    memory[0x043] = 0x90;
+    memory[0x044] = 0x90;
+    memory[0x045] = 0xE0;
+    // E
+    memory[0x046] = 0xF0;
+    memory[0x047] = 0x80;
+    memory[0x048] = 0xF0;
+    memory[0x049] = 0x80;
+    memory[0x04A] = 0xF0;
+    // F
+    memory[0x04B] = 0xF0;
+    memory[0x04C] = 0x80;
+    memory[0x04D] = 0xF0;
+    memory[0x04E] = 0x80;
+    memory[0x04F] = 0x80;
 }

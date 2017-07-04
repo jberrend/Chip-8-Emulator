@@ -8,7 +8,7 @@
 #include <list>
 
 void display::setBuffer(int i, int j, byte value) {
-    buffer[i][j] = value;
+    buffer[i][j] ^= value;
 
 }
 

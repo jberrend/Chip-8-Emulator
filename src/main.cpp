@@ -7,8 +7,8 @@ int main(int argc, char** argv) {
     // get the rom file location from the command line args
     emulator emu;
     if(argc != 2) {
-      printf("Must supply ROM path as the only command line arg.\n");
-      exit(1);
+        printf("Must supply ROM path as the only command line arg.\n");
+        exit(1);
     }
 
     emu.loadRom(argv[1]);

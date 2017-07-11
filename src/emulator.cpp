@@ -88,7 +88,7 @@ void emulator::run() {
         auto startTime = std::chrono::high_resolution_clock::now();
 
         // the time execution of the next instruction should ideally be finished before (1/500 of a second)
-        auto endGoalTime = startTime + std::chrono::milliseconds(1000 / 1000);
+        auto endGoalTime = startTime + std::chrono::milliseconds(1000 / 500);
         // load the next instruction to be executed
         instr.left_byte = memory[PC];
         instr.right_byte = memory[PC + 1];
@@ -101,6 +101,7 @@ void emulator::run() {
         // process the instruction
         processInstruction(instr);
 
+        // maybe?
 //        dis.clearBuffer();
 
         // update timer registers // TODO: implement threading or something to update these at a 60Hz interval
@@ -354,6 +355,9 @@ void emulator::processDisplayInstr(instruction_t instr) {
     byte regX = (byte) (instr.left_byte & 0x0F);
     byte regY = (byte) ((instr.right_byte & 0xF0) >> 4);
 
+    // variable to hold the x and y coord of each "pixel" of the sprite
+    int pixelX, pixelY;
+
     printf("Attempting to draw to display at %X, %X\n", registers[regX], registers[regY]);
 
     // get the number of bytes that the sprite takes
@@ -366,16 +370,27 @@ void emulator::processDisplayInstr(instruction_t instr) {
         byte sprite = memory[reg_I + i];
 
         for (int j = 0; j < 8; ++j) {
+            // update the pixel coordinates
+            pixelX = registers[regX] + j;
+            pixelY = registers[regY] + i;
+
+            // adjust the pixel position if it isn't within the displays range (wraparound)
+            while(pixelX > 63) {
+                pixelX -= 64;
+            }
+            while(pixelY > 31) {
+                pixelY -= 32;
+            }
 
             // if the left most bit is one ...
             if ((byte) (sprite & 0x80) > 0) {
                 // check if something will be overwritten
-                if (dis.getByteAtIndex(registers[regX] + j, registers[regY] + i)) {
+                if (dis.getByteAtIndex(pixelX, pixelY)) {
                     registers[0xF] = 1;
                 }
 
                 // update the buffer
-                dis.setBuffer(registers[regX] + j, registers[regY] + i, 1);
+                dis.setBuffer(pixelX, pixelY, 1);
             }
             // shift the sprite one byte to the left to get the next bit during the next iteration
             sprite <<= 1;

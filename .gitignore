@@ -1,3 +1,4 @@
 .idea/*
+.dir-locals.el
 
 cmake-build-debug/*

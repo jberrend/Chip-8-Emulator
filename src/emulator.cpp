@@ -199,6 +199,11 @@ void emulator::processInstruction(struct instruction_t instr) {
         case 0x80:
             // determine which instruction to execute
             switch (instr.right_byte & 0x0F) {
+                case 0x00:
+                    printf("Assigning register to another register\n");
+                    registers[instr.left_byte & 0x0F] = registers[(instr.right_byte & 0xF0) >> 4];
+
+                    break;
                 case 0x02:
                     printf("ANDing registers\n");
                     registers[instr.left_byte & 0x0F] &= registers[(instr.right_byte & 0xF0) >> 4];
@@ -216,6 +221,19 @@ void emulator::processInstruction(struct instruction_t instr) {
 
                     registers[instr.left_byte & 0x0F] += registers[(instr.right_byte & 0xF0) >> 4];
                     break;
+
+                case 0x05:
+                    printf("Subtracting registers\n");
+                    if (registers[instr.left_byte & 0x0F] > registers[(instr.right_byte & 0xF0) >> 4]) {
+                        registers[0xF] = 1;
+                    } else {
+                        registers[0xF] = 0;
+                    }
+
+                    registers[instr.left_byte & 0x0F] -= registers[(instr.right_byte & 0xF0) >> 4];
+
+                    break;
+
                 default:
                     printf("ERROR: Unknown instruction\n");
                     exit(1);
@@ -267,12 +285,21 @@ void emulator::processInstruction(struct instruction_t instr) {
 
                     PC += 2;
                     break;
+
                 case 0x15:
                     printf("Updating delay timer to 0x%X\n", registers[instr.left_byte & 0x0F]);
                     delay_timer = registers[instr.left_byte & 0x0F];
 
                     PC += 2;
                     break;
+
+                case 0X18:
+                    printf("Setting sound timer\n");
+                    sound_timer = registers[instr.left_byte & 0x0F];
+
+                    PC += 2;
+                    break;
+
                 case 0x29:
                     printf("Setting I to location of sprite located in register %X: %X\n", instr.left_byte & 0x0F,
                            registers[instr.left_byte & 0x0F]);

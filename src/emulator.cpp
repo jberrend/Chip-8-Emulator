@@ -58,8 +58,6 @@ void emulator::clearMemory() {
         memory[i] = 0x00;
     }
 
-    loadSprites();
-
     for (int i = 0; i < 8; i++) {
         registers[i] = 0x00;
     }
@@ -73,6 +71,8 @@ void emulator::clearMemory() {
     for (int i = 0; i < 16; i++) {
         stack[i] = 0x0000;
     }
+
+    loadSprites();
 }
 
 void emulator::initializeDisplay() {
@@ -82,13 +82,16 @@ void emulator::initializeDisplay() {
 void emulator::run() {
     bool running = true;
     struct instruction_t instr;
-    while (running) {
-        // start the timer that ensures paces the program's execution and
-        // timer registers
-        auto startTime = std::chrono::high_resolution_clock::now();
 
-        // the time execution of the next instruction should ideally be finished before (1/500 of a second)
-        auto endGoalTime = startTime + std::chrono::milliseconds(1000 / 500);
+    // start the timer that ensures paces the program's execution and
+    // timer registers
+    auto instrStartTime = std::chrono::high_resolution_clock::now();
+    auto nextTimerTick = instrStartTime + std::chrono::milliseconds(1000/60); // when the timer should tick
+    // the time execution of the next instruction should ideally be finished before (1/500 of a second)
+    registers[0xF] = 0x01;
+    auto endGoalTime = instrStartTime + std::chrono::milliseconds(1000 / 500);
+
+    while (running) {
         // load the next instruction to be executed
         instr.left_byte = memory[PC];
         instr.right_byte = memory[PC + 1];
@@ -102,20 +105,29 @@ void emulator::run() {
         processInstruction(instr);
 
         // maybe?
-//        dis.clearBuffer();
+        // dis.clearBuffer();
 
         // update timer registers // TODO: implement threading or something to update these at a 60Hz interval
-        if (delay_timer > 0) {
-            delay_timer--;
+        if (nextTimerTick < instrStartTime) {
+            if (delay_timer > 0) {
+                delay_timer--;
+            }
+            if (sound_timer > 0) {
+                sound_timer--;
+            }
+
+            // update the time for the next tick
+            nextTimerTick += std::chrono::milliseconds(1000 / 60);
         }
-        if (sound_timer > 0) {
-            sound_timer--;
-        }
+
         // sleep until end goal time
         if (std::chrono::high_resolution_clock::now() > endGoalTime) {
             std::cerr << "WARNING: Instruction took longer than expected" << std::endl;
         }
         std::this_thread::sleep_until(endGoalTime);
+
+        instrStartTime = std::chrono::high_resolution_clock::now();
+        endGoalTime = instrStartTime + std::chrono::milliseconds(1000 / 500);
 
     }
 }
@@ -212,9 +224,10 @@ void emulator::processInstruction(struct instruction_t instr) {
 
                 case 0x04: // TODO: Check if this works properly
                     printf("Adding registers together checking for overflow\n");
-                    if (registers[instr.left_byte & 0x0F] + registers[(instr.right_byte & 0xF0) >> 4] > 255) {
+                    printf("Register %X (%X) + %X (%X)\n", instr.left_byte & 0x0F, registers[instr.left_byte & 0x0F],
+                           (instr.right_byte & 0xF0) >> 4, registers[(instr.right_byte & 0xF0) >> 4]);
+                    if ((int)registers[instr.left_byte & 0x0F] + (int)registers[(instr.right_byte & 0xF0) >> 4] > 255) {
                         printf("Carry set\n");
-                        registers[0xF] = 0x01;
                     } else {
                         printf("Carry unset\n");
                         registers[0xF] = 0x00;
@@ -302,7 +315,7 @@ void emulator::processInstruction(struct instruction_t instr) {
                     break;
 
                 case 0x29:
-                    printf("Setting I to location of sprite located in register %X: %X\n", instr.left_byte & 0x0F,
+                    printf("Setting I to location of sprite for the digit located in register %X: %X\n", instr.left_byte & 0x0F,
                            registers[instr.left_byte & 0x0F]);
 
                     processSpriteLoadInstr(instr);

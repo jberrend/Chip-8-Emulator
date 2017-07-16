@@ -11,8 +11,9 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
+    // byte num = 1;
+    // std::cout << (num / 1) % 10 << std::endl;
     emu.loadRom(argv[1]);
-    // emu.loadRom("../Games/PONG");
     emu.initializeDisplay();
     emu.run();
     return 0;

@@ -1,4 +1,5 @@
 .idea/*
 .dir-locals.el
+debug-run-left-score.txt
 
 cmake-build-debug/*

@@ -328,7 +328,7 @@ void emulator::processInstruction(struct instruction_t instr) {
                            instr.left_byte & 0x0F);
 
                     // hundreds place
-                    memory[reg_I] = (byte) ((registers[instr.left_byte & 0x0F] / 100) % 10);
+                    memory[reg_I]     = (byte) ((registers[instr.left_byte & 0x0F] / 100) % 10);
 
                     // tens
                     memory[reg_I + 1] = (byte) ((registers[instr.left_byte & 0x0F] / 10) % 10);
@@ -342,7 +342,8 @@ void emulator::processInstruction(struct instruction_t instr) {
                 case 0x65:
                     printf("updating registers 0 to %X from memory\n", instr.left_byte & 0x0F);
 
-                    for (int i = 0; i < (instr.left_byte & 0x0F); i++) {
+                    // this <= right here took me 3 days of headscratching to find...
+                    for (int i = 0; i <= (instr.left_byte & 0x0F); i++) {
                         registers[i] = memory[reg_I + i];
                     }
 

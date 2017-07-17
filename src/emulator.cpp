@@ -88,8 +88,10 @@ void emulator::run() {
     auto instrStartTime = std::chrono::high_resolution_clock::now();
     auto nextTimerTick = instrStartTime + std::chrono::milliseconds(1000/60); // when the timer should tick
     // the time execution of the next instruction should ideally be finished before (1/500 of a second)
-    registers[0xF] = 0x01;
-    auto endGoalTime = instrStartTime + std::chrono::milliseconds(1000 / 500);
+
+    // registers[0xF] = 0x01; // why is this here? <--
+
+    auto endGoalTime = instrStartTime + std::chrono::milliseconds(1000 / 250);
 
     while (running) {
         // load the next instruction to be executed
@@ -222,15 +224,21 @@ void emulator::processInstruction(struct instruction_t instr) {
                     registers[instr.left_byte & 0x0F] &= registers[(instr.right_byte & 0xF0) >> 4];
                     break;
 
+                case 0x03:
+                    printf("XOR registers\n");
+                    registers[instr.left_byte & 0x0F] ^= registers[(instr.right_byte & 0xF0) >> 4];
+                    break;
+
                 case 0x04: // TODO: Check if this works properly
                     printf("Adding registers together checking for overflow\n");
                     printf("Register %X (%X) + %X (%X)\n", instr.left_byte & 0x0F, registers[instr.left_byte & 0x0F],
                            (instr.right_byte & 0xF0) >> 4, registers[(instr.right_byte & 0xF0) >> 4]);
                     if ((int)registers[instr.left_byte & 0x0F] + (int)registers[(instr.right_byte & 0xF0) >> 4] > 255) {
                         printf("Carry set\n");
+                        registers[0xF] = 1;
                     } else {
                         printf("Carry unset\n");
-                        registers[0xF] = 0x00;
+                        registers[0xF] = 0;
                     }
 
                     registers[instr.left_byte & 0x0F] += registers[(instr.right_byte & 0xF0) >> 4];
@@ -366,6 +374,11 @@ void emulator::processInstruction(struct instruction_t instr) {
 }
 
 void emulator::processDisplayInstr(instruction_t instr) {
+
+
+    // clear V[F] before drawing to the screen
+    registers[0xF] = 0x00;
+
     byte regX = (byte) (instr.left_byte & 0x0F);
     byte regY = (byte) ((instr.right_byte & 0xF0) >> 4);
 

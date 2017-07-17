@@ -1,0 +1,10 @@
+
+UFO:
+  to play, hold down Q, W and E on the keyboard and release an individual key to fire a missile left, center, or right respectively.
+  (I'm sure this is in some way incorrect, I just don't know how yet)
+
+BRIX:
+  Works just fine based on the screwing around that I did with it.
+
+PONG / PONG2:
+  Works fine, use 1/Q for P1 and 4/R for P2 for controls.

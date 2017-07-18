@@ -45,6 +45,9 @@ void emulator::loadRom(std::string name) {
 
     // seed the RNG
     srand(time(NULL));
+
+    // done with the contents of the ROM file
+    free(rom.contents);
 }
 
 void emulator::printRomContents() {
@@ -288,13 +291,36 @@ void emulator::processInstruction(struct instruction_t instr) {
             break;
 
         case 0xE0:
-            printf("Skipping next instr if key %X is pressed\n", registers[instr.left_byte & 0x0F]);
+            switch (instr.right_byte) {
+                case 0x9E:
+                    printf("Skipping next instr if key %X is pressed\n", registers[instr.left_byte & 0x0F]);
 
-            // is the key down?
-            if (inputHandler.isKeyDown(registers[instr.left_byte & 0x0F])) {
-                // skip.
-                printf("Skipping.\n");
-                PC += 2;
+                    // is the key down?
+                    if (inputHandler.isKeyDown(registers[instr.left_byte & 0x0F])) {
+                        // skip.
+                        printf("Skipping.\n");
+                        PC += 2;
+                    }
+
+                    break;
+
+                case 0xA1:
+                    printf("Skipping next instr if key %X is NOT pressed\n", registers[instr.left_byte & 0x0F]);
+
+                    // is the key down?
+                    if (!inputHandler.isKeyDown(registers[instr.left_byte & 0x0F])) {
+                        // skip.
+                        printf("Skipping.\n");
+                        PC += 2;
+                    }
+
+                    break;
+
+                default:
+                    printf("Error in instruction, exiting\n");
+                    exit(1);
+
+
             }
 
             PC += 2;

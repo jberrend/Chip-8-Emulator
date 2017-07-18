@@ -92,6 +92,9 @@ public:
     // load the predefined sprites into system memory
     void loadSprites();
 
+    // halt execution of the emulator until a key is pressed (used for 0xFx0A instr)
+    byte waitForKeyPress();
+
 
 };
 

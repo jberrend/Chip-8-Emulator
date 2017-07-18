@@ -94,7 +94,7 @@ void emulator::run() {
 
     // registers[0xF] = 0x01; // why is this here? <--
 
-    auto endGoalTime = instrStartTime + std::chrono::milliseconds(1000 / 250);
+    auto endGoalTime = instrStartTime + std::chrono::milliseconds(1000 / 100);
 
     while (running) {
         // load the next instruction to be executed
@@ -144,7 +144,7 @@ void emulator::processInstruction(struct instruction_t instr) {
     switch (instr.left_byte & 0xF0) {
         case 0x00:
             switch (instr.right_byte) {
-                case 0x00:
+                case 0xE0:
                     printf("clearing display");
                     dis.clearBuffer();
                     PC += 2;
@@ -259,6 +259,20 @@ void emulator::processInstruction(struct instruction_t instr) {
 
                     break;
 
+                case 0x06:
+                    //TODO: watch this one.
+                    printf("Shift right\n");
+                    registers[0xF] = 0;
+
+                    // check is least significant bit is one, set CF if so
+                    if ((registers[instr.left_byte & 0x0F] & 0x01) == 1) {
+                        registers[0xF] = 1;
+                    }
+
+                    registers[instr.left_byte & 0x0F] >>= 1;
+
+                    break;
+
                 default:
                     printf("ERROR: Unknown instruction\n");
                     exit(1);
@@ -334,6 +348,13 @@ void emulator::processInstruction(struct instruction_t instr) {
                     PC += 2;
                     break;
 
+                case 0x0A:
+                    printf("waiting for a key to be pressed...\n");
+                    registers[instr.left_byte & 0x0F] = waitForKeyPress();
+
+                    PC += 2;
+                    break;
+
                 case 0x15:
                     printf("Updating delay timer to 0x%X\n", registers[instr.left_byte & 0x0F]);
                     delay_timer = registers[instr.left_byte & 0x0F];
@@ -344,6 +365,13 @@ void emulator::processInstruction(struct instruction_t instr) {
                 case 0X18:
                     printf("Setting sound timer\n");
                     sound_timer = registers[instr.left_byte & 0x0F];
+
+                    PC += 2;
+                    break;
+
+                case 0x1E:
+                    printf("Adding I and register.\n");
+                    reg_I += registers[instr.left_byte & 0x0F];
 
                     PC += 2;
                     break;
@@ -447,6 +475,21 @@ void emulator::processDisplayInstr(instruction_t instr) {
             }
             // shift the sprite one byte to the left to get the next bit during the next iteration
             sprite <<= 1;
+        }
+    }
+}
+
+unsigned char emulator::waitForKeyPress() {
+    byte i;
+
+    // loop forever until a key is pressed
+    while(true) {
+        for(i = 0; i < 0xF; i++) {
+            if(inputHandler.isKeyDown(i)) {
+
+                // return the pressed key
+                return i;
+            }
         }
     }
 }

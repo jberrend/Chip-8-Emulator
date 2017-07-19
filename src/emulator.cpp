@@ -280,6 +280,17 @@ void emulator::processInstruction(struct instruction_t instr) {
 
             PC += 2;
             break;
+
+        case 0x90:
+            printf("skipping if registers are NOT equal\n");
+
+            if (registers[instr.left_byte & 0x0F] != registers[(instr.right_byte & 0xF0) >> 4]) {
+                PC += 2;
+            }
+
+            PC += 2;
+            break;
+
         case 0xA0:
             printf("Changing I to %X\n", instr.whole_instr & 0x0FFF);
 
@@ -397,6 +408,16 @@ void emulator::processInstruction(struct instruction_t instr) {
 
                     // ones
                     memory[reg_I + 2] = (byte) ((registers[instr.left_byte & 0x0F] / 1) % 10);
+
+                    PC += 2;
+                    break;
+
+                case 0x55:
+                    printf("updating memory at I with values in registers");
+
+                    for (int i = 0; i <= (instr.left_byte  & 0x0F); i++) {
+                        memory[reg_I + i] = registers[i];
+                    }
 
                     PC += 2;
                     break;

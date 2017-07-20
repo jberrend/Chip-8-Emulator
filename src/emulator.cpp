@@ -200,6 +200,16 @@ void emulator::processInstruction(struct instruction_t instr) {
             PC += 2;
             break;
 
+        case 0x50:
+            printf("Skipping if registers are equal\n");
+            if (registers[instr.x] == registers[instr.y]) {
+                printf("Skipping.\n");
+                PC += 2;
+            }
+
+            PC += 2;
+            break;
+
         case 0x60:
             printf("Setting register V%X to %X\n", instr.x, instr.right_byte);
 
@@ -223,8 +233,13 @@ void emulator::processInstruction(struct instruction_t instr) {
                 case 0x00:
                     printf("Assigning register to another register\n");
                     registers[instr.x] = registers[instr.y];
-
                     break;
+
+                case 0x01:
+                    printf("Bitwise OR\n");
+                    registers[instr.x] |= registers[instr.y];
+                    break;
+
                 case 0x02:
                     printf("ANDing registers\n");
                     registers[instr.x] &= registers[instr.y];
@@ -276,6 +291,20 @@ void emulator::processInstruction(struct instruction_t instr) {
 
                     break;
 
+                case 0x07:
+                    registers[0xF] = (registers[instr.y] > registers[instr.x]) ? 1 : 0;
+                    registers[instr.x] = registers[instr.y] - registers[instr.x];
+                    break;
+
+                case 0x0E:
+                    registers[0xF] = 0;
+                    if ((registers[instr.x] & 0x01) == 1) {
+                        registers[0xF] = 1;
+                    }
+
+                    registers[instr.x] <<= 1;
+                    break;
+
                 default:
                     printf("ERROR: Unknown instruction\n");
                     exit(1);
@@ -301,6 +330,11 @@ void emulator::processInstruction(struct instruction_t instr) {
             reg_I = (unsigned short) (instr.whole_instr & 0x0FFF);
 
             PC += 2;
+            break;
+
+        case 0xB0:
+            printf("Jumping to nnn");
+            PC = (instr.whole_instr & 0x0FFF) + registers[0x0];
             break;
 
         case 0xC0:

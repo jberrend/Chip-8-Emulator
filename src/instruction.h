@@ -12,6 +12,8 @@ typedef unsigned char byte;
 struct instruction_t {
     byte left_byte;
     byte right_byte;
+    byte x; // -X--
+    byte y; // --Y-
     unsigned short whole_instr;
 };
 

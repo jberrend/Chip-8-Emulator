@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-set(SOURCE_FILES src/main.cpp src/emulator.cpp src/emulator.h src/instruction.h src/display.cpp src/display.h src/InputHandler.cpp src/InputHandler.h)
+set(SOURCE_FILES src/main.cpp src/emulator.cpp src/emulator.h src/instruction.h src/display.cpp src/display.h src/input-handler.cpp src/input-handler.h)
 
 # DONT FORGET THIS LINE WHATEVER YOU DO
 set(EXECUTABLE_NAME "Chip8Emulator")

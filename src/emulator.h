@@ -8,7 +8,7 @@
 #include <fstream>
 #include "instruction.h"
 #include "display.h"
-#include "InputHandler.h"
+#include "input-handler.h"
 
 typedef unsigned char byte;
 

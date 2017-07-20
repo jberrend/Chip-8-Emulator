@@ -94,7 +94,7 @@ void emulator::run() {
 
     // registers[0xF] = 0x01; // why is this here? <--
 
-    auto endGoalTime = instrStartTime + std::chrono::milliseconds(1000 / 100);
+    auto endGoalTime = instrStartTime + std::chrono::milliseconds(1000 / 500);
 
     while (running) {
         // load the next instruction to be executed
@@ -106,11 +106,12 @@ void emulator::run() {
         instr.whole_instr <<= 8;
         instr.whole_instr |= instr.right_byte;
 
+        // finally store the 'x' and 'y' portions of the instruction for easy reference
+        instr.x = instr.left_byte & 0x0F;
+        instr.y = (instr.right_byte & 0xF0) >> 4;
+
         // process the instruction
         processInstruction(instr);
-
-        // maybe?
-        // dis.clearBuffer();
 
         // update timer registers // TODO: implement threading or something to update these at a 60Hz interval
         if (nextTimerTick < instrStartTime) {
@@ -131,6 +132,8 @@ void emulator::run() {
         }
         std::this_thread::sleep_until(endGoalTime);
 
+
+        // update the clocks for the next instruction
         instrStartTime = std::chrono::high_resolution_clock::now();
         endGoalTime = instrStartTime + std::chrono::milliseconds(1000 / 500);
 
@@ -177,10 +180,10 @@ void emulator::processInstruction(struct instruction_t instr) {
             break;
 
         case 0x30:
-            printf("Skipping next instr if register %X = %X\n", instr.left_byte & 0x0F, instr.right_byte);
+            printf("Skipping next instr if register %X = %X\n", instr.x, instr.right_byte);
 
             // if instr is to be skipped, increment the PC an additional time
-            if (registers[instr.left_byte & 0x0F] == instr.right_byte) {
+            if (registers[instr.x] == instr.right_byte) {
                 printf("Skipping.\n");
                 PC += 2;
             }
@@ -189,8 +192,8 @@ void emulator::processInstruction(struct instruction_t instr) {
             break;
 
         case 0x40:
-            printf("Skipping if %X != %X\n", registers[instr.left_byte & 0x0F], instr.right_byte);
-            if (registers[instr.left_byte & 0x0F] != instr.right_byte) {
+            printf("Skipping if %X != %X\n", registers[instr.x], instr.right_byte);
+            if (registers[instr.x] != instr.right_byte) {
                 printf("Skipping\n");
                 PC += 2;
             }
@@ -198,18 +201,18 @@ void emulator::processInstruction(struct instruction_t instr) {
             break;
 
         case 0x60:
-            printf("Setting register V%X to %X\n", instr.left_byte & 0x0F, instr.right_byte);
+            printf("Setting register V%X to %X\n", instr.x, instr.right_byte);
 
             // set the register to the appropriate value
-            registers[instr.left_byte & 0x0F] = instr.right_byte;
+            registers[instr.x] = instr.right_byte;
 
             // increment the PC for the next instruction
             PC += 2;
             break;
 
         case 0x70:
-            printf("adding 0x%X to register:%X \n", instr.right_byte, instr.left_byte & 0x0F);
-            registers[instr.left_byte & 0x0F] += instr.right_byte;
+            printf("adding 0x%X to register:%X \n", instr.right_byte, instr.x);
+            registers[instr.x] += instr.right_byte;
 
             PC += 2;
             break;
@@ -219,24 +222,24 @@ void emulator::processInstruction(struct instruction_t instr) {
             switch (instr.right_byte & 0x0F) {
                 case 0x00:
                     printf("Assigning register to another register\n");
-                    registers[instr.left_byte & 0x0F] = registers[(instr.right_byte & 0xF0) >> 4];
+                    registers[instr.x] = registers[instr.y];
 
                     break;
                 case 0x02:
                     printf("ANDing registers\n");
-                    registers[instr.left_byte & 0x0F] &= registers[(instr.right_byte & 0xF0) >> 4];
+                    registers[instr.x] &= registers[instr.y];
                     break;
 
                 case 0x03:
                     printf("XOR registers\n");
-                    registers[instr.left_byte & 0x0F] ^= registers[(instr.right_byte & 0xF0) >> 4];
+                    registers[instr.x] ^= registers[instr.y];
                     break;
 
                 case 0x04: // TODO: Check if this works properly
                     printf("Adding registers together checking for overflow\n");
-                    printf("Register %X (%X) + %X (%X)\n", instr.left_byte & 0x0F, registers[instr.left_byte & 0x0F],
-                           (instr.right_byte & 0xF0) >> 4, registers[(instr.right_byte & 0xF0) >> 4]);
-                    if ((int)registers[instr.left_byte & 0x0F] + (int)registers[(instr.right_byte & 0xF0) >> 4] > 255) {
+                    printf("Register %X (%X) + %X (%X)\n", instr.x, registers[instr.left_byte & 0x0F],
+                           instr.y, registers[(instr.right_byte & 0xF0) >> 4]);
+                    if ((int)registers[instr.x] + (int)registers[instr.y] > 255) {
                         printf("Carry set\n");
                         registers[0xF] = 1;
                     } else {
@@ -244,18 +247,18 @@ void emulator::processInstruction(struct instruction_t instr) {
                         registers[0xF] = 0;
                     }
 
-                    registers[instr.left_byte & 0x0F] += registers[(instr.right_byte & 0xF0) >> 4];
+                    registers[instr.x] += registers[instr.y];
                     break;
 
                 case 0x05:
                     printf("Subtracting registers\n");
-                    if (registers[instr.left_byte & 0x0F] > registers[(instr.right_byte & 0xF0) >> 4]) {
+                    if (registers[instr.x] > registers[instr.y]) {
                         registers[0xF] = 1;
                     } else {
                         registers[0xF] = 0;
                     }
 
-                    registers[instr.left_byte & 0x0F] -= registers[(instr.right_byte & 0xF0) >> 4];
+                    registers[instr.x] -= registers[instr.y];
 
                     break;
 
@@ -265,11 +268,11 @@ void emulator::processInstruction(struct instruction_t instr) {
                     registers[0xF] = 0;
 
                     // check is least significant bit is one, set CF if so
-                    if ((registers[instr.left_byte & 0x0F] & 0x01) == 1) {
+                    if ((registers[instr.x] & 0x01) == 1) {
                         registers[0xF] = 1;
                     }
 
-                    registers[instr.left_byte & 0x0F] >>= 1;
+                    registers[instr.x] >>= 1;
 
                     break;
 
@@ -284,7 +287,7 @@ void emulator::processInstruction(struct instruction_t instr) {
         case 0x90:
             printf("skipping if registers are NOT equal\n");
 
-            if (registers[instr.left_byte & 0x0F] != registers[(instr.right_byte & 0xF0) >> 4]) {
+            if (registers[instr.x] != registers[instr.y]) {
                 PC += 2;
             }
 
@@ -302,7 +305,7 @@ void emulator::processInstruction(struct instruction_t instr) {
 
         case 0xC0:
             printf("generating random number... \n");
-            registers[instr.left_byte & 0x0F] = (byte) (rand() % 256) & instr.right_byte;
+            registers[instr.x] = (byte) (rand() % 256) & instr.right_byte;
 
             PC += 2;
             break;
@@ -318,10 +321,10 @@ void emulator::processInstruction(struct instruction_t instr) {
         case 0xE0:
             switch (instr.right_byte) {
                 case 0x9E:
-                    printf("Skipping next instr if key %X is pressed\n", registers[instr.left_byte & 0x0F]);
+                    printf("Skipping next instr if key %X is pressed\n", registers[instr.x]);
 
                     // is the key down?
-                    if (inputHandler.isKeyDown(registers[instr.left_byte & 0x0F])) {
+                    if (inputHandler.isKeyDown(registers[instr.x])) {
                         // skip.
                         printf("Skipping.\n");
                         PC += 2;
@@ -330,10 +333,10 @@ void emulator::processInstruction(struct instruction_t instr) {
                     break;
 
                 case 0xA1:
-                    printf("Skipping next instr if key %X is NOT pressed\n", registers[instr.left_byte & 0x0F]);
+                    printf("Skipping next instr if key %X is NOT pressed\n", registers[instr.x]);
 
                     // is the key down?
-                    if (!inputHandler.isKeyDown(registers[instr.left_byte & 0x0F])) {
+                    if (!inputHandler.isKeyDown(registers[instr.x])) {
                         // skip.
                         printf("Skipping.\n");
                         PC += 2;
@@ -353,43 +356,43 @@ void emulator::processInstruction(struct instruction_t instr) {
         case 0xF0:
             switch (instr.right_byte) {
                 case 0x07:
-                    printf("Setting register %X to %X (delay timer)\n", instr.left_byte & 0x0F, delay_timer);
-                    registers[instr.left_byte & 0x0F] = delay_timer;
+                    printf("Setting register %X to %X (delay timer)\n", instr.x, delay_timer);
+                    registers[instr.x] = delay_timer;
 
                     PC += 2;
                     break;
 
                 case 0x0A:
                     printf("waiting for a key to be pressed...\n");
-                    registers[instr.left_byte & 0x0F] = waitForKeyPress();
+                    registers[instr.x] = waitForKeyPress();
 
                     PC += 2;
                     break;
 
                 case 0x15:
-                    printf("Updating delay timer to 0x%X\n", registers[instr.left_byte & 0x0F]);
-                    delay_timer = registers[instr.left_byte & 0x0F];
+                    printf("Updating delay timer to 0x%X\n", registers[instr.x]);
+                    delay_timer = registers[instr.x];
 
                     PC += 2;
                     break;
 
                 case 0X18:
                     printf("Setting sound timer\n");
-                    sound_timer = registers[instr.left_byte & 0x0F];
+                    sound_timer = registers[instr.x];
 
                     PC += 2;
                     break;
 
                 case 0x1E:
                     printf("Adding I and register.\n");
-                    reg_I += registers[instr.left_byte & 0x0F];
+                    reg_I += registers[instr.x];
 
                     PC += 2;
                     break;
 
                 case 0x29:
-                    printf("Setting I to location of sprite for the digit located in register %X: %X\n", instr.left_byte & 0x0F,
-                           registers[instr.left_byte & 0x0F]);
+                    printf("Setting I to location of sprite for the digit located in register %X: %X\n", instr.x,
+                           registers[instr.x]);
 
                     processSpriteLoadInstr(instr);
 
@@ -397,17 +400,17 @@ void emulator::processInstruction(struct instruction_t instr) {
                     break;
 
                 case 0x33:
-                    printf("Storing %i from register %X in I\n", registers[instr.left_byte & 0x0F],
-                           instr.left_byte & 0x0F);
+                    printf("Storing %i from register %X in I\n", registers[instr.x],
+                           instr.x);
 
                     // hundreds place
-                    memory[reg_I]     = (byte) ((registers[instr.left_byte & 0x0F] / 100) % 10);
+                    memory[reg_I]     = (byte) ((registers[instr.x] / 100) % 10);
 
                     // tens
-                    memory[reg_I + 1] = (byte) ((registers[instr.left_byte & 0x0F] / 10) % 10);
+                    memory[reg_I + 1] = (byte) ((registers[instr.x] / 10) % 10);
 
                     // ones
-                    memory[reg_I + 2] = (byte) ((registers[instr.left_byte & 0x0F] / 1) % 10);
+                    memory[reg_I + 2] = (byte) ((registers[instr.x] / 1) % 10);
 
                     PC += 2;
                     break;
@@ -415,7 +418,7 @@ void emulator::processInstruction(struct instruction_t instr) {
                 case 0x55:
                     printf("updating memory at I with values in registers");
 
-                    for (int i = 0; i <= (instr.left_byte  & 0x0F); i++) {
+                    for (int i = 0; i <= instr.x; i++) {
                         memory[reg_I + i] = registers[i];
                     }
 
@@ -423,10 +426,10 @@ void emulator::processInstruction(struct instruction_t instr) {
                     break;
 
                 case 0x65:
-                    printf("updating registers 0 to %X from memory\n", instr.left_byte & 0x0F);
+                    printf("updating registers 0 to %X from memory\n", instr.x);
 
                     // this <= right here took me 3 days of headscratching to find...
-                    for (int i = 0; i <= (instr.left_byte & 0x0F); i++) {
+                    for (int i = 0; i <= (instr.x); i++) {
                         registers[i] = memory[reg_I + i];
                     }
 
@@ -450,12 +453,11 @@ void emulator::processInstruction(struct instruction_t instr) {
 
 void emulator::processDisplayInstr(instruction_t instr) {
 
-
     // clear V[F] before drawing to the screen
     registers[0xF] = 0x00;
 
-    byte regX = (byte) (instr.left_byte & 0x0F);
-    byte regY = (byte) ((instr.right_byte & 0xF0) >> 4);
+    byte regX = (byte) (instr.x);
+    byte regY = (byte) (instr.y);
 
     // variable to hold the x and y coord of each "pixel" of the sprite
     int pixelX, pixelY;
@@ -501,7 +503,7 @@ void emulator::processDisplayInstr(instruction_t instr) {
 }
 
 unsigned char emulator::waitForKeyPress() {
-    byte i;
+    byte i; // iterator
 
     // loop forever until a key is pressed
     while(true) {
@@ -516,7 +518,7 @@ unsigned char emulator::waitForKeyPress() {
 }
 
 void emulator::processSpriteLoadInstr(instruction_t instr) {
-    byte spriteToLoad = (byte) (registers[instr.left_byte & 0x0F]);
+    byte spriteToLoad = (byte) (registers[instr.x]);
 
     switch (spriteToLoad) {
         case 0x00:

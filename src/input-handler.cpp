@@ -4,7 +4,7 @@
 
 #include <SFML/Window/Keyboard.hpp>
 #include <iostream>
-#include "InputHandler.h"
+#include "input-handler.h"
 
 bool InputHandler::isKeyDown(unsigned char key) {
     switch (key) {

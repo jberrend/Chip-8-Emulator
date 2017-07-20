@@ -3,3 +3,4 @@
 debug-run-left-score.txt
 
 cmake-build-debug/*
+build/*

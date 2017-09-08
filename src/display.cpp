@@ -25,6 +25,8 @@ void display::update() {
 
         if (event.type == sf::Event::Closed) {
             window->close();
+            delete window;
+            exit(0);
         }
     }
 

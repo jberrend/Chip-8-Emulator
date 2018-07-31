@@ -5,8 +5,8 @@
 #include <chrono>
 #include <thread>
 #include <iostream>
-#include "emulator.h"
-#include "instruction.h"
+#include "emulator.hpp"
+#include "instruction.hpp"
 
 void emulator::loadRom(std::string name) {
     // clear the memory vars for use

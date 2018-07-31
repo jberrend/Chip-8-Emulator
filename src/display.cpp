@@ -4,7 +4,7 @@
 
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/Graphics/RectangleShape.hpp>
-#include "display.h"
+#include "display.hpp"
 #include <list>
 
 void display::setBuffer(int i, int j, byte value) {

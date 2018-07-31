@@ -1,6 +1,6 @@
 #include <iostream>
 #include <SFML/Graphics.hpp>
-#include "emulator.h"
+#include "emulator.hpp"
 
 int main(int argc, char** argv) {
 

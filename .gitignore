@@ -1,6 +1,6 @@
 .idea/*
 .dir-locals.el
 debug-run-left-score.txt
-
+.vscode/*
 cmake-build-debug/*
 build/*

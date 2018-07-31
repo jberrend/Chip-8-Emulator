@@ -410,7 +410,7 @@ void emulator::processInstruction(struct instruction_t instr) {
                     PC += 2;
                     break;
 
-                case 0X18:
+                case 0x18:
                     printf("Setting sound timer\n");
                     sound_timer = registers[instr.x];
 
@@ -612,24 +612,24 @@ void emulator::processSpriteLoadInstr(instruction_t instr) {
 
 void emulator::loadSprites() {
     // 0
-    memory[0x000] = 0xF0;
-    memory[0x001] = 0x90;
-    memory[0x002] = 0x90;
-    memory[0x003] = 0x90;
-    memory[0x004] = 0xF0;
+    memory[0x000] = 0xF0; // XXXX
+    memory[0x001] = 0x90; // X..X
+    memory[0x002] = 0x90; // X..X
+    memory[0x003] = 0x90; // X..X
+    memory[0x004] = 0xF0; // XXXX
     // 1
-    memory[0x005] = 0x20;
-    memory[0x006] = 0x60;
-    memory[0x007] = 0x20;
-    memory[0x008] = 0x20;
-    memory[0x009] = 0x70;
+    memory[0x005] = 0x20; // ..X.
+    memory[0x006] = 0x60; // .XX.
+    memory[0x007] = 0x20; // ..X.
+    memory[0x008] = 0x20; // ..X.
+    memory[0x009] = 0x70; // .XXX
     // 2
-    memory[0x00A] = 0xF0;
-    memory[0x00B] = 0x10;
-    memory[0x00C] = 0xF0;
-    memory[0x00D] = 0x80;
-    memory[0x00E] = 0xF0;
-    // 3
+    memory[0x00A] = 0xF0; // XXXX
+    memory[0x00B] = 0x10; // ...X
+    memory[0x00C] = 0xF0; // XXXX
+    memory[0x00D] = 0x80; // X...
+    memory[0x00E] = 0xF0; // XXXX
+    // 3                  // etc
     memory[0x00F] = 0xF0;
     memory[0x010] = 0x10;
     memory[0x011] = 0xF0;
